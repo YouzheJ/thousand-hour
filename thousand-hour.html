@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>thousand hour</title>
+    <script src="jquery-3.2.0.min.js"></script>
+    <style>
+        h1, p, body {
+            margin:0;
+            padding: 0;
+        }
+        body {
+            font-family: 'SimHei';
+            color:#252626;
+            background: #f6f6f6;
+        }
+        .main-box {
+            width:100%;
+            height:100%;
+        }
+        .main {
+            width:400px;
+            height:400px;
+            /*background: #333;*/
+            position: fixed;
+            top:50%;
+            left: 50%;
+            -webkit-transform: translate(-50%, -50%);
+            -moz-transform: translate(-50%, -50%);
+            -ms-transform: translate(-50%, -50%);
+            -o-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+        }
+        .clock {
+            width:100%;
+            height:100%;
+            background: #f0f0f0;
+            border-radius: 50%;
+            text-align: center;
+            -webkit-box-shadow: 10px 10px 20px #999;
+            -moz-box-shadow:  10px 10px 20px #999;
+            box-shadow:  10px 10px 20px #999;
+            cursor: pointer;
+            -webkit-transition: all 0.1s;
+            -moz-transition: all 0.1s;
+            -ms-transition: all 0.1s;
+            -o-transition: all 0.1s;
+            transition: all 0.1s;
+        }
+        .clock:hover {
+            background: #f6f6f6;
+            color:#666;
+        }
+        h1 {
+            font-size: 40px;
+            padding-top: 100px;
+            font-weight: normal;
+        }
+        p {
+            font-size: 46px;
+            padding-top: 50px;
+        }
+        a {
+            color:#252626;
+            text-decoration: none;
+        }
+        .title {
+            padding-top:10%;
+            text-align: center;
+            font-size: 40px;
+        }
+        .start, .pre-rest {
+            padding-top: 175px;
+            font-size: 40px;
+            display: none;
+        }
+        .pre-rest {
+            padding-top: 120px;
+        }
+        .btn-group {
+            padding-top: 50px;
+        }
+        .rest, .count {
+            display: none;
+        }
+
+        /*蝴蝶的动画*/
+        .butterfly {
+            position: fixed;
+            top:20%;
+            left:60%;
+            display: none;
+        }
+        .b-wing, .b-body {
+            position: absolute;
+            top:0;
+            left:0;
+        }
+        .btn {
+            display:inline-block;
+            width:100px;
+            height:40px;
+            line-height: 40px;
+            text-align: center;
+            border-radius: 5px;
+            font-size: 20px;
+            background: #ccc;
+            color:#333;
+        }
+        .rest-btn {
+            background: #00cc66;
+            color:#fff;
+        }
+        .rest-btn:hover {
+            background: #00dd63;
+        }
+        .quit-btn {
+            background: #cc6666;
+            color: #fff;
+        }
+        .quit-btn:hover {
+            background: #ff6363;
+        }
+        .continue-btn:hover {
+            background: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-box">
+        <div class="title">
+            距离10000小时有多远
+        </div>
+        <div class="main">
+            <div class="clock">
+                <!--进入页面显示-->
+                <div class="has-learn">
+                    <h1>共学习时间</h1>
+                    <p class="time">00:00:00</p>
+                </div>
+                <!--开始学前-->
+                <div class="start">
+                    <span>开始学习</span>
+                </div>
+                <!--学习中-->
+                <div class="count">
+                    <h1>奋斗中...</h1>
+                    <p class="time">00:00:00</p>
+                </div>
+                <!--休息前-->
+                <div class="pre-rest">
+                    <span>奋斗吧！骚年</span>
+                    <div class="btn-group">
+                        <a class="btn rest-btn" href="javascript:void(0)">休息一下</a>
+                        <a class="btn continue-btn" href="javascript:void(0)">继续学习</a>
+                        <a class="btn quit-btn" href="javascript:void(0)">退出学习</a>
+                    </div>
+                </div>
+                <!--休息中-->
+                <div class="rest">
+                    <h1>已休息</h1>
+                    <p class="time">00:00:00</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="butterfly">
+        <div class="b-wing b-wing-r"><img src="img/butterfly-wing.png"></div>
+        <div class="b-body"><img src="img/butterfly-body.png"></div>
+        <div class="b-wing b-wing-l"><img src="img/butterfly-wing.png"></div>
+    </div>
+    <script>
+        var timeObj = {
+            initTime: 0,//初始时间，毫秒
+            totalTime: 0,//总时间,
+            record:[]
+        }
+        var tmpTime = {//临时变量，缓存用，防止错把浏览器关闭，而没有保存起数据
+            date: 0,//当时的日期，时间戳
+            time: 0//当次的时间长度
+        }
+        var learning = false;//用于判断是否正在学习
+        var rest = false;//用于判断是否休息中
+        var timer = null;
+        var timerRest = null;
+        if(localStorage['clock-time']){
+            timeObj = JSON.parse(localStorage['clock-time']);
+            $(".has-learn .time").html(getTime(totalTimeFun(timeObj.record)));
+        }
+        if(localStorage['clock-tmp']) { // 说明上次是非正常退出，显示为休息中的状态
+            showCurrent($('.rest'));
+            tmpTime = JSON.parse(localStorage['clock-tmp']);
+            learning = true;
+            rest = true;
+            // time为tmpTime中date与当前时间的差
+            var saveDate = tmpTime.date;
+            var nowDate = Date.parse(new Date());
+            var time = nowDate - saveDate - tmpTime.time*1000;
+            $(".rest .time").html('00:00:00');
+            timerRest = setInterval(function() {
+                time += 1000;
+                $(".rest .time").html(getClock(time));
+            }, 1000);
+        }
+        // 计算时间差
+        function getClock(time) {//time为毫秒数
+            var h = parseInt(time/(60*60*1000));
+            var m = parseInt((time-h*60*60*1000)/(60*1000));
+            var s = parseInt((time-h*60*60*1000-m*60*1000)/1000);
+            return addZero(h) + ':' + addZero(m) + ':' + addZero(s);
+        }
+        $('.clock').mouseenter(function(){
+            if(!learning) {
+                showCurrent($('.start'));
+            }else {
+                showCurrent($('.pre-rest'));
+                if(rest) {
+                    $('.rest-btn').hide();
+                    $('.continue-btn').show();
+                }else {
+                    $('.continue-btn').hide();
+                    $('.rest-btn').show();
+                }
+            }
+        });
+        $('.clock').mouseleave(function(){
+            /* 鼠标离开
+                  如果学习前：显示已学习时间
+                  如果正在学习且未休息，显示奋斗时间
+                  如果休息中，显示休息时间
+            */
+            if(!learning){
+                showCurrent($('.has-learn'));
+            }else {
+                if(!rest) {
+                    showCurrent($('.count'));
+                }else {
+                    showCurrent($('.rest'));
+                }
+            }
+        });
+        $('.clock').click(function(){
+            if(!learning) {
+                tmpTime.date = Date.parse(new Date());//获取当前时间戳,并保存当时的日期时间戳
+                showCurrent($('.count'));
+                learning = true;
+                var time = 0;//初始化计时
+                startLearnFun(time);
+            }
+        });
+        // 学习中时，才会显示按钮组中的三个按钮
+        $('.rest-btn').click(function(e) {
+            e.stopPropagation();
+            if(!rest) {
+                showCurrent($('.rest'));
+                clearInterval(timer);
+                rest = true;
+                var time = 0;//初始化计时
+                startRestFun(time);
+            }
+        });
+        $('.continue-btn').click(function(e) {
+            e.stopPropagation();
+            if(rest) {//休息中
+                rest = false;
+                clearInterval(timerRest);
+                timerRest = null;
+                tmpTime = JSON.parse(localStorage['clock-tmp']);
+                var time = tmpTime.time;
+                startLearnFun(time);
+                showCurrent($('.count'));
+            }
+        });
+        $('.quit-btn').click(function(e) {
+            e.stopPropagation();
+            var result = confirm("确定要退出此次学习吗？");
+            if(result) {
+                showCurrent($('.start'));
+                learning = false;
+                clearInterval(timer);
+                timer = null;
+                $(".count .time").html('00:00:00');
+                // 将数据保存到本地
+                timeObj.record.push(JSON.parse(localStorage['clock-tmp']));
+                localStorage['clock-tmp'] = '';
+                $(".has-learn .time").html(getTime(totalTimeFun(timeObj.record)));
+                localStorage['clock-time'] = JSON.stringify(timeObj);
+            }
+        });
+        //启动学习中的计时器function
+        function startLearnFun(time) {
+            timer = setInterval(function() {
+                $(".count .time").html(getTime(++time));
+                tmpTime.time = time;
+                localStorage['clock-tmp'] = JSON.stringify(tmpTime);
+            }, 1000);
+        }
+        // 启动休息中的计时器function
+        function startRestFun(time) {
+            $(".rest .time").html('00:00:00');
+            timerRest = setInterval(function() {
+                $(".rest .time").html(getTime(++time));
+            }, 1000);
+        }
+
+        // 一些工具方法
+        // 只显示指定的元素
+        function showCurrent(el) {//需要传入jq对象
+            $('.count').hide();
+            $('.has-learn').hide();
+            $('.start').hide();
+            $('.pre-rest').hide();
+            $('.rest').hide();
+            el.show();
+        }
+        //计算总时间
+        function totalTimeFun(list) {
+            var total = 0;
+            list.forEach(function(value) {
+                total += value.time;
+            });
+            console.log(total);
+            return total;
+        }
+        function getTime(time){//time为秒数
+            var date = new Date(time*1000);// 由于传入的只是时间段，转换为时间后：Thu Jan 01 1970 08:00:00 GMT+0800 (中国标准时间)
+            var hour = addZero(date.getHours()-8);
+            var minute = addZero(date.getMinutes());
+            var second = addZero(date.getSeconds());
+            return hour + ':' + minute + ':' + second;
+        }
+        function addZero(value) {
+            if(value<10){
+                return '0'+value;
+            }
+            return value;
+        }
+    </script>
+</body>
+</html>
